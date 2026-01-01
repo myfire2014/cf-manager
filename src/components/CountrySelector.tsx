@@ -276,7 +276,7 @@ export const CountrySelector = () => (
       <span id="selected_count" class="text-xs text-gray-500 ml-auto self-center">已选: 0</span>
     </div>
     <div class="max-h-96 overflow-y-auto space-y-4" id="country_list">
-      {Object.entries(COUNTRIES).map(([key, region]) => (
+      {Object.entries(COUNTRIES).map(([_key, region]) => (
         <div class="country-group">
           <h4 class="font-medium text-sm text-gray-700 mb-2 sticky top-0 bg-gray-50 py-1">{region.name}</h4>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">

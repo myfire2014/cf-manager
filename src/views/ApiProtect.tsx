@@ -20,7 +20,7 @@ export const ApiProtect = () => (
             <h3 class="font-medium mb-2">📍 保护路径（每行一个）：</h3>
             <textarea 
               name="paths" 
-              rows={3} 
+              rows="3" 
               class="w-full border border-gray-300 p-3 rounded-lg text-sm" 
               placeholder="/api/*&#10;/login&#10;/register&#10;/user/*"
             >/api/*</textarea>
@@ -92,7 +92,7 @@ export const ApiProtect = () => (
               </div>
               <div>
                 <label class="block text-sm mb-1">最大请求数：</label>
-                <input type="number" name="rate_limit" value={100} class="w-full border border-gray-300 p-2 rounded-lg" />
+                <input type="number" name="rate_limit" value="100" class="w-full border border-gray-300 p-2 rounded-lg" />
               </div>
               <div>
                 <label class="block text-sm mb-1">超限处理：</label>
@@ -109,7 +109,7 @@ export const ApiProtect = () => (
           {/* 白名单 */}
           <div class="border-t pt-4">
             <h3 class="font-medium mb-2">✅ IP 白名单（每行一个，可选）：</h3>
-            <textarea name="whitelist" rows={2} class="w-full border border-gray-300 p-3 rounded-lg text-sm" placeholder="1.2.3.4&#10;5.6.7.0/24"></textarea>
+            <textarea name="whitelist" rows="2" class="w-full border border-gray-300 p-3 rounded-lg text-sm" placeholder="1.2.3.4&#10;5.6.7.0/24"></textarea>
             <p class="text-xs text-gray-500 mt-1">白名单 IP 不受上述规则限制，支持 CIDR 格式</p>
           </div>
 
