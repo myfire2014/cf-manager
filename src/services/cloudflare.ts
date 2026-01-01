@@ -266,6 +266,14 @@ export class CloudflareClient {
     paths: string[];
     rules: string[];
     whitelist: string[];
+    action: string; // js_challenge | managed_challenge | block
+    blockedCountries?: string[];
+    rateLimit?: {
+      enabled: boolean;
+      period: number;
+      limit: number;
+      action: string;
+    };
   }) {
     const ruleName = "API Protection";
     
@@ -290,13 +298,16 @@ export class CloudflareClient {
       whitelistCondition = ` and not (${ipConditions})`;
     }
 
+    // 统一使用传入的 action
+    const action = config.action || "managed_challenge";
+
     // 构建各种防护规则
     const ruleExpressions: Array<{ expression: string; action: string; description: string }> = [];
 
-    if (config.rules.includes("no_referer")) {
+    if (config.rules.includes("challenge_no_referer")) {
       ruleExpressions.push({
         expression: `(${pathConditions}) and not any(http.request.headers["referer"][*] contains ".")${whitelistCondition}`,
-        action: "block",
+        action,
         description: `${ruleName} - No Referer`
       });
     }
@@ -304,7 +315,7 @@ export class CloudflareClient {
     if (config.rules.includes("no_browser_ua")) {
       ruleExpressions.push({
         expression: `(${pathConditions}) and not http.user_agent contains "Mozilla"${whitelistCondition}`,
-        action: "block",
+        action,
         description: `${ruleName} - No Browser UA`
       });
     }
@@ -312,15 +323,17 @@ export class CloudflareClient {
     if (config.rules.includes("empty_ua")) {
       ruleExpressions.push({
         expression: `(${pathConditions}) and http.user_agent eq ""${whitelistCondition}`,
-        action: "block",
+        action,
         description: `${ruleName} - Empty UA`
       });
     }
 
-    if (config.rules.includes("block_countries")) {
+    if (config.rules.includes("block_countries") && config.blockedCountries && config.blockedCountries.length > 0) {
+      // 使用用户选择的国家列表
+      const countryCodes = config.blockedCountries.map(c => `"${c}"`).join(" ");
       ruleExpressions.push({
-        expression: `(${pathConditions}) and ip.geoip.country in {"RU" "KP" "IR"}${whitelistCondition}`,
-        action: "block",
+        expression: `(${pathConditions}) and ip.geoip.country in {${countryCodes}}${whitelistCondition}`,
+        action,
         description: `${ruleName} - Block Countries`
       });
     }
@@ -328,8 +341,19 @@ export class CloudflareClient {
     if (config.rules.includes("challenge_suspicious")) {
       ruleExpressions.push({
         expression: `(${pathConditions}) and cf.threat_score gt 10${whitelistCondition}`,
-        action: "managed_challenge",
+        action,
         description: `${ruleName} - Challenge Suspicious`
+      });
+    }
+
+    // 速率限制规则
+    if (config.rateLimit?.enabled) {
+      // 注意：真正的速率限制需要使用 Rate Limiting Rules API
+      // 这里使用 WAF 规则模拟，基于请求特征
+      ruleExpressions.push({
+        expression: `(${pathConditions}) and cf.threat_score gt 5${whitelistCondition}`,
+        action: config.rateLimit.action,
+        description: `${ruleName} - Rate Limit Simulation`
       });
     }
 

@@ -27,15 +27,43 @@ export const ApiProtect = () => (
             <p class="text-xs text-gray-500 mt-1">支持通配符 *，如 /api/* 匹配所有 /api/ 开头的路径</p>
           </div>
 
+          {/* 统一安全级别 */}
+          <div class="border-t pt-4">
+            <h3 class="font-medium mb-3">🔐 触发规则后的处理方式：</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <label class="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                <input type="radio" name="action" value="js_challenge" class="w-4 h-4" />
+                <div>
+                  <span class="font-medium">🧩 JS 质询</span>
+                  <p class="text-xs text-gray-500">要求浏览器执行 JavaScript 验证</p>
+                </div>
+              </label>
+              <label class="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                <input type="radio" name="action" value="managed_challenge" checked class="w-4 h-4" />
+                <div>
+                  <span class="font-medium">🤖 托管质询</span>
+                  <p class="text-xs text-gray-500">Cloudflare 智能判断验证方式（推荐）</p>
+                </div>
+              </label>
+              <label class="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-red-500 has-[:checked]:bg-red-50">
+                <input type="radio" name="action" value="block" class="w-4 h-4" />
+                <div>
+                  <span class="font-medium">🚫 直接屏蔽</span>
+                  <p class="text-xs text-gray-500">拒绝请求并返回错误页面</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
           {/* 防护规则 */}
-          <div>
+          <div class="border-t pt-4">
             <h3 class="font-medium mb-3">🔒 防护规则（勾选要启用的）：</h3>
             <div class="space-y-3">
               <label class="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" name="rules" value="challenge_no_referer" checked class="mt-1 w-4 h-4 rounded" />
                 <div>
-                  <span class="font-medium">质询无 Referer 请求</span>
-                  <p class="text-xs text-gray-500">对没有来源页面的请求进行 JS 质询（比直接屏蔽更温和）</p>
+                  <span class="font-medium">拦截无 Referer 请求</span>
+                  <p class="text-xs text-gray-500">对没有来源页面的请求进行处理</p>
                 </div>
               </label>
               <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-700">
@@ -45,7 +73,7 @@ export const ApiProtect = () => (
               <label class="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" name="rules" value="no_browser_ua" checked class="mt-1 w-4 h-4 rounded" />
                 <div>
-                  <span class="font-medium">屏蔽非浏览器 User-Agent</span>
+                  <span class="font-medium">拦截非浏览器 User-Agent</span>
                   <p class="text-xs text-gray-500">阻止 UA 中不含 Mozilla 的请求（过滤脚本工具）</p>
                 </div>
               </label>
@@ -53,7 +81,7 @@ export const ApiProtect = () => (
               <label class="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" name="rules" value="empty_ua" checked class="mt-1 w-4 h-4 rounded" />
                 <div>
-                  <span class="font-medium">屏蔽空 User-Agent</span>
+                  <span class="font-medium">拦截空 User-Agent</span>
                   <p class="text-xs text-gray-500">阻止没有 UA 的请求</p>
                 </div>
               </label>
@@ -61,8 +89,8 @@ export const ApiProtect = () => (
               <label class="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" name="rules" value="block_countries" id="block_countries_toggle" class="mt-1 w-4 h-4 rounded" />
                 <div>
-                  <span class="font-medium">屏蔽指定国家/地区</span>
-                  <p class="text-xs text-gray-500">阻止来自选定国家/地区的请求（支持 240+ 国家/地区，含搜索功能）</p>
+                  <span class="font-medium">拦截指定国家/地区</span>
+                  <p class="text-xs text-gray-500">阻止来自选定国家/地区的请求（支持 240+ 国家/地区）</p>
                 </div>
               </label>
               <CountrySelector />
@@ -71,8 +99,8 @@ export const ApiProtect = () => (
               <label class="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" name="rules" value="challenge_suspicious" class="mt-1 w-4 h-4 rounded" />
                 <div>
-                  <span class="font-medium">质询可疑请求（威胁分数 &gt; 10）</span>
-                  <p class="text-xs text-gray-500">对 CF 判定为可疑的请求进行 JS 质询</p>
+                  <span class="font-medium">拦截可疑请求（威胁分数 &gt; 10）</span>
+                  <p class="text-xs text-gray-500">对 Cloudflare 判定为可疑的请求进行处理</p>
                 </div>
               </label>
             </div>
@@ -81,7 +109,11 @@ export const ApiProtect = () => (
           {/* 速率限制 */}
           <div class="border-t pt-4">
             <h3 class="font-medium mb-3">⏱️ 速率限制（Rate Limiting）：</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label class="flex items-center gap-2 mb-3">
+              <input type="checkbox" name="enable_rate_limit" id="enable_rate_limit" class="w-4 h-4 rounded" />
+              <span class="text-sm">启用速率限制</span>
+            </label>
+            <div id="rate_limit_options" class="grid grid-cols-1 md:grid-cols-3 gap-4 opacity-50 pointer-events-none">
               <div>
                 <label class="block text-sm mb-1">时间窗口：</label>
                 <select name="rate_period" class="w-full border border-gray-300 p-2 rounded-lg">
@@ -98,12 +130,24 @@ export const ApiProtect = () => (
                 <label class="block text-sm mb-1">超限处理：</label>
                 <select name="rate_action" class="w-full border border-gray-300 p-2 rounded-lg">
                   <option value="block">屏蔽</option>
-                  <option value="challenge">JS 质询</option>
+                  <option value="js_challenge">JS 质询</option>
                   <option value="managed_challenge">托管质询</option>
                 </select>
               </div>
             </div>
-            <p class="text-xs text-gray-500 mt-2">⚠️ 免费版 Rate Limiting 有限制，此功能通过 WAF 规则模拟实现基础防护</p>
+            <p class="text-xs text-gray-500 mt-2">⚠️ 速率限制通过 WAF 规则模拟实现，可能有一定延迟</p>
+            <script>
+              {`
+                document.getElementById('enable_rate_limit').addEventListener('change', function() {
+                  const options = document.getElementById('rate_limit_options');
+                  if (this.checked) {
+                    options.classList.remove('opacity-50', 'pointer-events-none');
+                  } else {
+                    options.classList.add('opacity-50', 'pointer-events-none');
+                  }
+                });
+              `}
+            </script>
           </div>
 
           {/* 白名单 */}
@@ -115,7 +159,15 @@ export const ApiProtect = () => (
 
           <div class="flex gap-4">
             <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium">🚀 应用防护规则</button>
-            <button type="button" hx-post="/api/api-protect/remove" hx-target="#result" hx-confirm="确定要移除所有域名的 API 防护规则吗？" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-medium">🗑️ 移除规则</button>
+            <button 
+              type="button"
+              hx-post="/api/api-protect/remove"
+              hx-target="#result"
+              hx-confirm="确定要移除所有域名的 API 防护规则吗？"
+              class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-medium"
+            >
+              🗑️ 移除规则
+            </button>
             <span id="loading" class="htmx-indicator text-gray-500 self-center">处理中...</span>
           </div>
         </form>
@@ -125,22 +177,30 @@ export const ApiProtect = () => (
 
       {/* 说明 */}
       <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="font-bold mb-3">📖 防护说明</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <h3 class="font-bold mb-3">📖 处理方式说明</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div class="border rounded p-3">
-            <h4 class="font-medium text-green-700">✅ 适合场景</h4>
+            <h4 class="font-medium text-blue-700">🧩 JS 质询</h4>
             <ul class="text-gray-600 mt-1 space-y-1">
-              <li>• 登录/注册接口防暴力破解</li>
-              <li>• API 接口防 CC 攻击</li>
-              <li>• 防止爬虫批量请求</li>
+              <li>• 要求浏览器执行 JavaScript</li>
+              <li>• 可过滤简单脚本和爬虫</li>
+              <li>• 对用户体验影响较小</li>
             </ul>
           </div>
           <div class="border rounded p-3">
-            <h4 class="font-medium text-yellow-700">⚠️ 注意事项</h4>
+            <h4 class="font-medium text-green-700">🤖 托管质询（推荐）</h4>
             <ul class="text-gray-600 mt-1 space-y-1">
-              <li>• 如有移动端 APP，需加入白名单或调整规则</li>
-              <li>• 第三方回调接口需排除在外</li>
-              <li>• 规则过严可能影响正常用户</li>
+              <li>• Cloudflare 智能判断</li>
+              <li>• 可能显示验证码或直接放行</li>
+              <li>• 平衡安全性和用户体验</li>
+            </ul>
+          </div>
+          <div class="border rounded p-3">
+            <h4 class="font-medium text-red-700">🚫 直接屏蔽</h4>
+            <ul class="text-gray-600 mt-1 space-y-1">
+              <li>• 直接拒绝请求</li>
+              <li>• 最严格的防护方式</li>
+              <li>• 可能误伤正常用户</li>
             </ul>
           </div>
         </div>

@@ -1,11 +1,11 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { html } from "@elysiajs/html";
 import { Home } from "./views/Home";
 import { Settings } from "./views/Settings";
 import { Domains, ZoneList } from "./views/Domains";
 import { BotBlock, BotBlockResult } from "./views/BotBlock";
 import { ApiProtect, ApiProtectResult } from "./views/ApiProtect";
-import { Alert, LogItem } from "./components/Alert";
+import { Alert } from "./components/Alert";
 import { ConfigService, LogService } from "./services/db";
 import { CloudflareClient, getClient } from "./services/cloudflare";
 
@@ -416,11 +416,10 @@ const app = new Elysia()
   
   // 应用蜘蛛屏蔽规则
   .post("/api/bot-block/apply", async ({ body }) => {
-    const { bots, customBots, action, scope } = body as {
+    const { bots, customBots, action } = body as {
       bots: string | string[];
       customBots: string;
       action: string;
-      scope: string;
     };
 
     const client = getClient();
@@ -490,10 +489,16 @@ const app = new Elysia()
   
   // 应用 API 防护规则
   .post("/api/api-protect/apply", async ({ body }) => {
-    const { paths, rules, whitelist } = body as {
+    const { paths, rules, whitelist, action, blocked_countries, enable_rate_limit, rate_period, rate_limit, rate_action } = body as {
       paths: string;
       rules: string | string[];
       whitelist: string;
+      action: string;
+      blocked_countries: string | string[];
+      enable_rate_limit: string;
+      rate_period: string;
+      rate_limit: string;
+      rate_action: string;
     };
 
     const client = getClient();
@@ -519,17 +524,42 @@ const app = new Elysia()
     // 解析白名单
     const whitelistIps = whitelist ? whitelist.split("\n").map(ip => ip.trim()).filter(Boolean) : [];
 
+    // 解析屏蔽的国家
+    let blockedCountries: string[] = [];
+    if (blocked_countries) {
+      blockedCountries = Array.isArray(blocked_countries) ? blocked_countries : [blocked_countries];
+    }
+
+    // 解析速率限制
+    const rateLimitConfig = enable_rate_limit === "on" ? {
+      enabled: true,
+      period: parseInt(rate_period) || 60,
+      limit: parseInt(rate_limit) || 100,
+      action: rate_action || "block"
+    } : undefined;
+
     const zones = await client.listZones();
     const results: Array<{ domain: string; success: boolean; message: string }> = [];
+
+    // 获取处理方式的中文描述
+    const actionLabels: Record<string, string> = {
+      "js_challenge": "JS 质询",
+      "managed_challenge": "托管质询",
+      "block": "直接屏蔽"
+    };
+    const actionLabel = actionLabels[action] || action;
 
     for (const zone of zones) {
       try {
         await client.createApiProtectRule(zone.id, {
           paths: pathList,
           rules: ruleList,
-          whitelist: whitelistIps
+          whitelist: whitelistIps,
+          action: action || "managed_challenge",
+          blockedCountries,
+          rateLimit: rateLimitConfig
         });
-        results.push({ domain: zone.name, success: true, message: "防护规则已应用" });
+        results.push({ domain: zone.name, success: true, message: `防护规则已应用 (${actionLabel})` });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         results.push({ domain: zone.name, success: false, message: msg });
@@ -562,7 +592,7 @@ const app = new Elysia()
     return <ApiProtectResult results={results} />;
   })
 
-  .listen(3001);
+  .listen(3000);
 
 console.log(`
 ☁️  Cloudflare 批量助手已启动
