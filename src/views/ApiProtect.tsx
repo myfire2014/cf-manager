@@ -10,13 +10,46 @@ export const ApiProtect = () => (
         <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
           <p class="text-sm text-gray-600">
             通过 Cloudflare WAF 规则保护 API 接口，防止 CC 攻击和恶意请求。
-            规则会应用到所有域名。
+            规则会应用到指定域名的所有子域名和泛域名。
           </p>
         </div>
 
         <form hx-post="/api/api-protect/apply" hx-target="#result" hx-indicator="#loading" class="space-y-6">
-          {/* 保护路径 */}
+          {/* 应用范围 */}
           <div>
+            <h3 class="font-medium mb-2">🌐 应用范围：</h3>
+            <div class="space-y-3">
+              <label class="flex items-center gap-2">
+                <input type="radio" name="scope" value="all" id="scope_all" checked class="w-4 h-4" />
+                <span>应用到所有域名</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="radio" name="scope" value="selected" id="scope_selected" class="w-4 h-4" />
+                <span>仅应用到指定域名</span>
+              </label>
+              <div id="domains_input" class="ml-6 hidden">
+                <textarea 
+                  name="domains" 
+                  rows="3" 
+                  class="w-full border border-gray-300 p-3 rounded-lg text-sm" 
+                  placeholder="example.com&#10;example.org&#10;mydomain.net"
+                ></textarea>
+                <p class="text-xs text-gray-500 mt-1">每行一个主域名，规则将应用到该域名下的所有子域名</p>
+              </div>
+            </div>
+            <script>
+              {`
+                document.querySelectorAll('input[name="scope"]').forEach(radio => {
+                  radio.addEventListener('change', function() {
+                    document.getElementById('domains_input').classList.toggle('hidden', this.value !== 'selected');
+                  });
+                });
+              `}
+            </script>
+          </div>
+
+          {/* 保护路径 */}
+          <div class="border-t pt-4">
             <h3 class="font-medium mb-2">📍 保护路径（每行一个）：</h3>
             <textarea 
               name="paths" 
@@ -161,15 +194,46 @@ export const ApiProtect = () => (
             <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium">🚀 应用防护规则</button>
             <button 
               type="button"
-              hx-post="/api/api-protect/remove"
-              hx-target="#result"
-              hx-confirm="确定要移除所有域名的 API 防护规则吗？"
+              id="remove_rules_btn"
               class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-medium"
             >
               🗑️ 移除规则
             </button>
             <span id="loading" class="htmx-indicator text-gray-500 self-center">处理中...</span>
           </div>
+          <script>
+            {`
+              document.getElementById('remove_rules_btn').addEventListener('click', function() {
+                const scope = document.querySelector('input[name="scope"]:checked').value;
+                const domains = document.querySelector('textarea[name="domains"]').value;
+                const scopeText = scope === 'all' ? '所有域名' : '指定域名';
+                
+                if (!confirm('确定要移除' + scopeText + '的 API 防护规则吗？')) {
+                  return;
+                }
+                
+                // 构建表单数据
+                const formData = new FormData();
+                formData.append('scope', scope);
+                if (scope === 'selected') {
+                  formData.append('domains', domains);
+                }
+                
+                // 发送请求
+                fetch('/api/api-protect/remove', {
+                  method: 'POST',
+                  body: formData
+                })
+                .then(response => response.text())
+                .then(html => {
+                  document.getElementById('result').innerHTML = html;
+                })
+                .catch(err => {
+                  document.getElementById('result').innerHTML = '<div class="p-4 bg-red-100 text-red-700 rounded">请求失败: ' + err.message + '</div>';
+                });
+              });
+            `}
+          </script>
         </form>
 
         <div id="result" class="mt-6"></div>

@@ -55,16 +55,14 @@ const app = new Elysia()
   .post("/api/verify-config", async ({ body }) => {
     const { email, apiKey } = body as { email: string; apiKey: string };
     
-    console.log("[verify-config] 收到请求, body:", JSON.stringify(body));
-    
     // 如果表单传了值，用表单的；否则用已保存的
     const useEmail = email || ConfigService.get("cf_email");
     const useApiKey = apiKey || ConfigService.get("cf_api_key");
     
-    console.log("[verify-config] 使用邮箱:", useEmail);
-    console.log("[verify-config] API Key 长度:", useApiKey?.length || 0);
+    LogService.add("system", "verify-config", "info", `开始验证, 邮箱: ${useEmail}, API Key 长度: ${useApiKey?.length || 0}`);
     
     if (!useEmail || !useApiKey) {
+      LogService.add("system", "verify-config", "error", "缺少 API 凭证");
       return <Alert type="error" message="请先填写 API 凭证" />;
     }
     
@@ -72,16 +70,18 @@ const app = new Elysia()
     
     try {
       const valid = await client.verifyToken();
-      console.log("[verify-config] 验证结果:", valid);
       
       if (valid) {
         const accountId = await client.getAccountId();
+        LogService.add("system", "verify-config", "success", `验证成功, Account ID: ${accountId}`);
         return <Alert type="success" message={`连接成功！Account ID: ${accountId}`} />;
       }
+      LogService.add("system", "verify-config", "error", "API 凭证无效");
       return <Alert type="error" message="API 凭证无效，请检查邮箱和 API Key" />;
     } catch (err) {
-      console.error("[verify-config] 验证异常:", err);
-      return <Alert type="error" message={`验证出错: ${err instanceof Error ? err.message : String(err)}`} />;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      LogService.add("system", "verify-config", "error", `验证异常: ${errMsg}`);
+      return <Alert type="error" message={`验证出错: ${errMsg}`} />;
     }
   })
 
@@ -489,7 +489,7 @@ const app = new Elysia()
   
   // 应用 API 防护规则
   .post("/api/api-protect/apply", async ({ body }) => {
-    const { paths, rules, whitelist, action, blocked_countries, enable_rate_limit, rate_period, rate_limit, rate_action } = body as {
+    const { paths, rules, whitelist, action, blocked_countries, enable_rate_limit, rate_period, rate_limit, rate_action, scope, domains } = body as {
       paths: string;
       rules: string | string[];
       whitelist: string;
@@ -499,6 +499,8 @@ const app = new Elysia()
       rate_period: string;
       rate_limit: string;
       rate_action: string;
+      scope: string;
+      domains: string;
     };
 
     const client = getClient();
@@ -538,7 +540,24 @@ const app = new Elysia()
       action: rate_action || "block"
     } : undefined;
 
-    const zones = await client.listZones();
+    // 获取所有域名
+    const allZones = await client.listZones();
+    
+    // 根据范围筛选域名
+    let targetZones = allZones;
+    if (scope === "selected" && domains) {
+      const domainList = domains.split("\n").map(d => d.trim().toLowerCase()).filter(Boolean);
+      if (domainList.length === 0) {
+        return <Alert type="warning" message="请输入要应用规则的域名" />;
+      }
+      // 筛选匹配的域名
+      targetZones = allZones.filter(zone => domainList.includes(zone.name.toLowerCase()));
+      
+      if (targetZones.length === 0) {
+        return <Alert type="warning" message={`未找到匹配的域名。输入的域名: ${domainList.join(", ")}`} />;
+      }
+    }
+
     const results: Array<{ domain: string; success: boolean; message: string }> = [];
 
     // 获取处理方式的中文描述
@@ -549,7 +568,7 @@ const app = new Elysia()
     };
     const actionLabel = actionLabels[action] || action;
 
-    for (const zone of zones) {
+    for (const zone of targetZones) {
       try {
         await client.createApiProtectRule(zone.id, {
           paths: pathList,
@@ -570,16 +589,29 @@ const app = new Elysia()
   })
 
   // 移除 API 防护规则
-  .post("/api/api-protect/remove", async () => {
+  .post("/api/api-protect/remove", async ({ body }) => {
+    const { scope, domains } = body as { scope?: string; domains?: string };
+    
     const client = getClient();
     if (!client) {
       return <Alert type="error" message="请先配置 API 凭证" />;
     }
 
-    const zones = await client.listZones();
+    // 获取所有域名
+    const allZones = await client.listZones();
+    
+    // 根据范围筛选域名
+    let targetZones = allZones;
+    if (scope === "selected" && domains) {
+      const domainList = domains.split("\n").map(d => d.trim().toLowerCase()).filter(Boolean);
+      if (domainList.length > 0) {
+        targetZones = allZones.filter(zone => domainList.includes(zone.name.toLowerCase()));
+      }
+    }
+
     const results: Array<{ domain: string; success: boolean; message: string }> = [];
 
-    for (const zone of zones) {
+    for (const zone of targetZones) {
       try {
         await client.removeApiProtectRule(zone.id);
         results.push({ domain: zone.name, success: true, message: "规则已移除" });
