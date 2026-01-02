@@ -14,7 +14,7 @@ const defaultBots = [
   { name: "PetalBot", desc: "华为花瓣搜索爬虫", checked: false },
 ];
 
-export const BotBlock = ({ currentRules }: { currentRules?: string[] }) => (
+export const BotBlock = () => (
   <Layout title="蜘蛛屏蔽 - CF Manager">
     <div class="space-y-6">
       <div class="bg-white rounded-lg shadow p-6">
@@ -27,7 +27,7 @@ export const BotBlock = ({ currentRules }: { currentRules?: string[] }) => (
           </p>
         </div>
 
-        <form hx-post="/api/bot-block/apply" hx-target="#result" hx-indicator="#loading" class="space-y-6">
+        <form id="bot-block-form" class="space-y-6">
           {/* 预设蜘蛛列表 */}
           <div>
             <h3 class="font-medium mb-3">📋 常见爬虫（勾选要屏蔽的）：</h3>
@@ -65,7 +65,7 @@ export const BotBlock = ({ currentRules }: { currentRules?: string[] }) => (
           {/* 操作选项 */}
           <div>
             <h3 class="font-medium mb-2">⚙️ 操作方式：</h3>
-            <div class="flex gap-4">
+            <div class="flex gap-4 flex-wrap">
               <label class="flex items-center gap-2">
                 <input type="radio" name="action" value="block" checked class="w-4 h-4" />
                 <span>🚫 屏蔽（返回 403）</span>
@@ -84,38 +84,38 @@ export const BotBlock = ({ currentRules }: { currentRules?: string[] }) => (
           {/* 应用范围 */}
           <div>
             <h3 class="font-medium mb-2">🌐 应用范围：</h3>
-            <div class="flex gap-4">
+            <div class="space-y-3">
               <label class="flex items-center gap-2">
-                <input type="radio" name="scope" value="all" checked class="w-4 h-4" />
-                <span>所有域名</span>
+                <input type="radio" name="scope" value="all" id="scope_all" checked class="w-4 h-4" />
+                <span>应用到所有域名</span>
               </label>
               <label class="flex items-center gap-2">
-                <input type="radio" name="scope" value="selected" class="w-4 h-4" />
-                <span>指定域名</span>
+                <input type="radio" name="scope" value="selected" id="scope_selected" class="w-4 h-4" />
+                <span>仅应用到指定域名</span>
               </label>
+              <div id="domains_input" class="ml-6 hidden">
+                <textarea 
+                  name="domains" 
+                  rows="3" 
+                  class="w-full border border-gray-300 p-3 rounded-lg text-sm" 
+                  placeholder="example.com&#10;example.org&#10;mydomain.net"
+                ></textarea>
+                <p class="text-xs text-gray-500 mt-1">每行一个主域名</p>
+              </div>
             </div>
           </div>
 
           <div class="flex gap-4">
-            <button 
-              type="submit" 
-              class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition font-medium"
-            >
+            <button type="button" id="apply_btn" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition font-medium">
               🚀 应用规则
             </button>
-            <button 
-              type="button"
-              hx-post="/api/bot-block/remove"
-              hx-target="#result"
-              hx-confirm="确定要移除所有域名的蜘蛛屏蔽规则吗？"
-              class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-medium"
-            >
+            <button type="button" id="remove_btn" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-medium">
               🗑️ 移除规则
             </button>
-            <span id="loading" class="htmx-indicator text-gray-500 self-center">处理中...</span>
           </div>
         </form>
 
+        {/* 实时日志区域 */}
         <div id="result" class="mt-6"></div>
       </div>
 
@@ -131,6 +131,142 @@ export const BotBlock = ({ currentRules }: { currentRules?: string[] }) => (
         </ul>
       </div>
     </div>
+
+    <script>
+      {`
+        // 切换域名输入框显示
+        document.querySelectorAll('input[name="scope"]').forEach(function(radio) {
+          radio.addEventListener('change', function() {
+            document.getElementById('domains_input').classList.toggle('hidden', this.value !== 'selected');
+          });
+        });
+
+        // 收集表单数据
+        function collectFormData() {
+          var form = document.getElementById('bot-block-form');
+          var data = {};
+          
+          // bots
+          var botsCheckboxes = form.querySelectorAll('input[name="bots"]:checked');
+          data.bots = Array.from(botsCheckboxes).map(function(cb) { return cb.value; }).join(',');
+          
+          // customBots
+          var customBotsTextarea = form.querySelector('textarea[name="customBots"]');
+          data.customBots = customBotsTextarea ? customBotsTextarea.value.split('\\n').filter(function(b) { return b.trim(); }).join(',') : '';
+          
+          // action
+          var actionRadio = form.querySelector('input[name="action"]:checked');
+          data.action = actionRadio ? actionRadio.value : 'block';
+          
+          // scope
+          var scopeRadio = form.querySelector('input[name="scope"]:checked');
+          data.scope = scopeRadio ? scopeRadio.value : 'all';
+          
+          // domains
+          var domainsTextarea = form.querySelector('textarea[name="domains"]');
+          data.domains = domainsTextarea ? domainsTextarea.value.split('\\n').filter(function(d) { return d.trim(); }).join(',') : '';
+          
+          return data;
+        }
+
+        // 构建 URL 查询参数
+        function buildQueryString(data) {
+          return Object.keys(data).map(function(key) {
+            return encodeURIComponent(key) + '=' + encodeURIComponent(data[key] || '');
+          }).join('&');
+        }
+
+        // 执行 SSE 请求
+        function executeSSE(url, actionText) {
+          var resultDiv = document.getElementById('result');
+          resultDiv.innerHTML = '<div class="border rounded-lg overflow-hidden"><div class="bg-gray-100 px-4 py-2 font-medium">📋 执行日志</div><div id="log-container" class="p-4 bg-gray-50 max-h-96 overflow-y-auto font-mono text-sm space-y-1"></div><div id="summary" class="px-4 py-3 bg-gray-100 hidden"></div></div>';
+          
+          var logContainer = document.getElementById('log-container');
+          var summary = document.getElementById('summary');
+          var isDone = false;
+          
+          var eventSource = new EventSource(url);
+          
+          eventSource.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+            var logLine = document.createElement('div');
+            
+            if (data.type === 'log') {
+              logLine.className = 'text-gray-600';
+              logLine.textContent = '⏳ ' + data.message;
+            } else if (data.type === 'success') {
+              logLine.className = 'text-green-600';
+              logLine.textContent = '✅ ' + data.domain + ': ' + data.message;
+            } else if (data.type === 'fail') {
+              logLine.className = 'text-red-600';
+              logLine.textContent = '❌ ' + data.domain + ': ' + data.message;
+            } else if (data.type === 'error') {
+              logLine.className = 'text-red-600 font-medium';
+              logLine.textContent = '⚠️ 错误: ' + data.message;
+              isDone = true;
+              eventSource.close();
+            } else if (data.type === 'done') {
+              isDone = true;
+              summary.classList.remove('hidden');
+              var statusClass = data.failCount === 0 ? 'text-green-700' : 'text-yellow-700';
+              summary.innerHTML = '<span class="' + statusClass + ' font-medium">' + actionText + '完成：成功 ' + data.successCount + ' / 失败 ' + data.failCount + ' (共 ' + data.total + ' 个域名)</span>';
+              eventSource.close();
+              return;
+            }
+            
+            logContainer.appendChild(logLine);
+            logContainer.scrollTop = logContainer.scrollHeight;
+          };
+          
+          eventSource.onerror = function() {
+            eventSource.close();
+            if (!isDone) {
+              var errorLine = document.createElement('div');
+              errorLine.className = 'text-red-600';
+              errorLine.textContent = '⚠️ 连接已断开';
+              logContainer.appendChild(errorLine);
+            }
+          };
+        }
+
+        // 应用规则按钮
+        document.getElementById('apply_btn').addEventListener('click', function() {
+          var data = collectFormData();
+          
+          if (!data.bots && !data.customBots) {
+            alert('请至少选择一个要屏蔽的蜘蛛');
+            return;
+          }
+          
+          var url = '/api/bot-block/apply-stream?' + buildQueryString(data);
+          executeSSE(url, '应用规则');
+        });
+
+        // 移除规则按钮
+        document.getElementById('remove_btn').addEventListener('click', function() {
+          var scopeRadio = document.querySelector('input[name="scope"]:checked');
+          var scope = scopeRadio ? scopeRadio.value : 'all';
+          var scopeText = scope === 'all' ? '所有域名' : '指定域名';
+          
+          if (!confirm('确定要移除' + scopeText + '的蜘蛛屏蔽规则吗？')) {
+            return;
+          }
+          
+          var data = {
+            scope: scope,
+            domains: ''
+          };
+          
+          if (scope === 'selected') {
+            var domainsTextarea = document.querySelector('textarea[name="domains"]');
+            data.domains = domainsTextarea ? domainsTextarea.value.split('\\n').filter(function(d) { return d.trim(); }).join(',') : '';
+          }
+          
+          var url = '/api/bot-block/remove-stream?' + buildQueryString(data);
+          executeSSE(url, '移除规则');
+        });
+      `}
+    </script>
   </Layout>
 );
 
