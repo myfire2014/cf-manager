@@ -14,7 +14,7 @@ export const ApiProtect = () => (
           </p>
         </div>
 
-        <form hx-post="/api/api-protect/apply" hx-target="#result" hx-indicator="#loading" class="space-y-6">
+        <form id="api-protect-form" class="space-y-6">
           {/* 应用范围 */}
           <div>
             <h3 class="font-medium mb-2">🌐 应用范围：</h3>
@@ -37,15 +37,6 @@ export const ApiProtect = () => (
                 <p class="text-xs text-gray-500 mt-1">每行一个主域名，规则将应用到该域名下的所有子域名</p>
               </div>
             </div>
-            <script>
-              {`
-                document.querySelectorAll('input[name="scope"]').forEach(radio => {
-                  radio.addEventListener('change', function() {
-                    document.getElementById('domains_input').classList.toggle('hidden', this.value !== 'selected');
-                  });
-                });
-              `}
-            </script>
           </div>
 
           {/* 保护路径 */}
@@ -90,7 +81,7 @@ export const ApiProtect = () => (
 
           {/* 防护规则 */}
           <div class="border-t pt-4">
-            <h3 class="font-medium mb-3">🔒 防护规则（勾选要启用的）：</h3>
+            <h3 class="font-medium mb-3">� 防护规直则（勾选要启用的）：</h3>
             <div class="space-y-3">
               <label class="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" name="rules" value="challenge_no_referer" checked class="mt-1 w-4 h-4 rounded" />
@@ -169,18 +160,6 @@ export const ApiProtect = () => (
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">⚠️ 速率限制通过 WAF 规则模拟实现，可能有一定延迟</p>
-            <script>
-              {`
-                document.getElementById('enable_rate_limit').addEventListener('change', function() {
-                  const options = document.getElementById('rate_limit_options');
-                  if (this.checked) {
-                    options.classList.remove('opacity-50', 'pointer-events-none');
-                  } else {
-                    options.classList.add('opacity-50', 'pointer-events-none');
-                  }
-                });
-              `}
-            </script>
           </div>
 
           {/* 白名单 */}
@@ -191,51 +170,12 @@ export const ApiProtect = () => (
           </div>
 
           <div class="flex gap-4">
-            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium">🚀 应用防护规则</button>
-            <button 
-              type="button"
-              id="remove_rules_btn"
-              class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-medium"
-            >
-              🗑️ 移除规则
-            </button>
-            <span id="loading" class="htmx-indicator text-gray-500 self-center">处理中...</span>
+            <button type="button" id="apply_btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium">🚀 应用防护规则</button>
+            <button type="button" id="remove_btn" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-medium">🗑️ 移除规则</button>
           </div>
-          <script>
-            {`
-              document.getElementById('remove_rules_btn').addEventListener('click', function() {
-                const scope = document.querySelector('input[name="scope"]:checked').value;
-                const domains = document.querySelector('textarea[name="domains"]').value;
-                const scopeText = scope === 'all' ? '所有域名' : '指定域名';
-                
-                if (!confirm('确定要移除' + scopeText + '的 API 防护规则吗？')) {
-                  return;
-                }
-                
-                // 构建表单数据
-                const formData = new FormData();
-                formData.append('scope', scope);
-                if (scope === 'selected') {
-                  formData.append('domains', domains);
-                }
-                
-                // 发送请求
-                fetch('/api/api-protect/remove', {
-                  method: 'POST',
-                  body: formData
-                })
-                .then(response => response.text())
-                .then(html => {
-                  document.getElementById('result').innerHTML = html;
-                })
-                .catch(err => {
-                  document.getElementById('result').innerHTML = '<div class="p-4 bg-red-100 text-red-700 rounded">请求失败: ' + err.message + '</div>';
-                });
-              });
-            `}
-          </script>
         </form>
 
+        {/* 实时日志区域 */}
         <div id="result" class="mt-6"></div>
       </div>
 
@@ -270,6 +210,171 @@ export const ApiProtect = () => (
         </div>
       </div>
     </div>
+
+    <script>
+      {`
+        // 切换域名输入框显示
+        document.querySelectorAll('input[name="scope"]').forEach(function(radio) {
+          radio.addEventListener('change', function() {
+            document.getElementById('domains_input').classList.toggle('hidden', this.value !== 'selected');
+          });
+        });
+
+        // 切换速率限制选项
+        document.getElementById('enable_rate_limit').addEventListener('change', function() {
+          var options = document.getElementById('rate_limit_options');
+          if (this.checked) {
+            options.classList.remove('opacity-50', 'pointer-events-none');
+          } else {
+            options.classList.add('opacity-50', 'pointer-events-none');
+          }
+        });
+
+        // 收集表单数据
+        function collectFormData() {
+          var form = document.getElementById('api-protect-form');
+          var data = {};
+          
+          // scope
+          var scopeRadio = form.querySelector('input[name="scope"]:checked');
+          data.scope = scopeRadio ? scopeRadio.value : 'all';
+          
+          // domains
+          var domainsTextarea = form.querySelector('textarea[name="domains"]');
+          data.domains = domainsTextarea ? domainsTextarea.value.split('\\n').filter(function(d) { return d.trim(); }).join(',') : '';
+          
+          // paths
+          var pathsTextarea = form.querySelector('textarea[name="paths"]');
+          data.paths = pathsTextarea ? pathsTextarea.value.split('\\n').filter(function(p) { return p.trim(); }).join(',') : '';
+          
+          // action
+          var actionRadio = form.querySelector('input[name="action"]:checked');
+          data.action = actionRadio ? actionRadio.value : 'managed_challenge';
+          
+          // rules
+          var rulesCheckboxes = form.querySelectorAll('input[name="rules"]:checked');
+          data.rules = Array.from(rulesCheckboxes).map(function(cb) { return cb.value; }).join(',');
+          
+          // blocked_countries
+          var countryCheckboxes = form.querySelectorAll('input[name="blocked_countries"]:checked');
+          data.blocked_countries = Array.from(countryCheckboxes).map(function(cb) { return cb.value; }).join(',');
+          
+          // whitelist
+          var whitelistTextarea = form.querySelector('textarea[name="whitelist"]');
+          data.whitelist = whitelistTextarea ? whitelistTextarea.value.split('\\n').filter(function(ip) { return ip.trim(); }).join(',') : '';
+          
+          // rate limit
+          var rateLimitCheckbox = form.querySelector('input[name="enable_rate_limit"]');
+          data.enable_rate_limit = rateLimitCheckbox && rateLimitCheckbox.checked ? 'on' : '';
+          data.rate_period = form.querySelector('select[name="rate_period"]').value;
+          data.rate_limit = form.querySelector('input[name="rate_limit"]').value;
+          data.rate_action = form.querySelector('select[name="rate_action"]').value;
+          
+          return data;
+        }
+
+        // 构建 URL 查询参数
+        function buildQueryString(data) {
+          return Object.keys(data).map(function(key) {
+            return encodeURIComponent(key) + '=' + encodeURIComponent(data[key] || '');
+          }).join('&');
+        }
+
+        // 执行 SSE 请求
+        function executeSSE(url, actionText) {
+          var resultDiv = document.getElementById('result');
+          resultDiv.innerHTML = '<div class="border rounded-lg overflow-hidden"><div class="bg-gray-100 px-4 py-2 font-medium">📋 执行日志</div><div id="log-container" class="p-4 bg-gray-50 max-h-96 overflow-y-auto font-mono text-sm space-y-1"></div><div id="summary" class="px-4 py-3 bg-gray-100 hidden"></div></div>';
+          
+          var logContainer = document.getElementById('log-container');
+          var summary = document.getElementById('summary');
+          var isDone = false;
+          
+          var eventSource = new EventSource(url);
+          
+          eventSource.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+            var logLine = document.createElement('div');
+            
+            if (data.type === 'log') {
+              logLine.className = 'text-gray-600';
+              logLine.textContent = '⏳ ' + data.message;
+            } else if (data.type === 'success') {
+              logLine.className = 'text-green-600';
+              logLine.textContent = '✅ ' + data.domain + ': ' + data.message;
+            } else if (data.type === 'fail') {
+              logLine.className = 'text-red-600';
+              logLine.textContent = '❌ ' + data.domain + ': ' + data.message;
+            } else if (data.type === 'error') {
+              logLine.className = 'text-red-600 font-medium';
+              logLine.textContent = '⚠️ 错误: ' + data.message;
+              isDone = true;
+              eventSource.close();
+            } else if (data.type === 'done') {
+              isDone = true;
+              summary.classList.remove('hidden');
+              var statusClass = data.failCount === 0 ? 'text-green-700' : 'text-yellow-700';
+              summary.innerHTML = '<span class="' + statusClass + ' font-medium">' + actionText + '完成：成功 ' + data.successCount + ' / 失败 ' + data.failCount + ' (共 ' + data.total + ' 个域名)</span>';
+              eventSource.close();
+              return;
+            }
+            
+            logContainer.appendChild(logLine);
+            logContainer.scrollTop = logContainer.scrollHeight;
+          };
+          
+          eventSource.onerror = function() {
+            eventSource.close();
+            if (!isDone) {
+              var errorLine = document.createElement('div');
+              errorLine.className = 'text-red-600';
+              errorLine.textContent = '⚠️ 连接已断开';
+              logContainer.appendChild(errorLine);
+            }
+          };
+        }
+
+        // 应用规则按钮
+        document.getElementById('apply_btn').addEventListener('click', function() {
+          var data = collectFormData();
+          
+          if (!data.paths) {
+            alert('请输入要保护的路径');
+            return;
+          }
+          if (!data.rules) {
+            alert('请至少选择一个防护规则');
+            return;
+          }
+          
+          var url = '/api/api-protect/apply-stream?' + buildQueryString(data);
+          executeSSE(url, '应用防护规则');
+        });
+
+        // 移除规则按钮
+        document.getElementById('remove_btn').addEventListener('click', function() {
+          var scopeRadio = document.querySelector('input[name="scope"]:checked');
+          var scope = scopeRadio ? scopeRadio.value : 'all';
+          var scopeText = scope === 'all' ? '所有域名' : '指定域名';
+          
+          if (!confirm('确定要移除' + scopeText + '的 API 防护规则吗？')) {
+            return;
+          }
+          
+          var data = {
+            scope: scope,
+            domains: ''
+          };
+          
+          if (scope === 'selected') {
+            var domainsTextarea = document.querySelector('textarea[name="domains"]');
+            data.domains = domainsTextarea ? domainsTextarea.value.split('\\n').filter(function(d) { return d.trim(); }).join(',') : '';
+          }
+          
+          var url = '/api/api-protect/remove-stream?' + buildQueryString(data);
+          executeSSE(url, '移除规则');
+        });
+      `}
+    </script>
   </Layout>
 );
 

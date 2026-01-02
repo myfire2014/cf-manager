@@ -487,7 +487,209 @@ const app = new Elysia()
 
   // ========== API 防护 ==========
   
-  // 应用 API 防护规则
+  // 应用 API 防护规则 (SSE 流式响应)
+  .get("/api/api-protect/apply-stream", ({ query }) => {
+    const { paths, rules, whitelist, action, blocked_countries, enable_rate_limit, rate_period, rate_limit: rateLimit, rate_action, scope, domains } = query as {
+      paths: string;
+      rules: string;
+      whitelist: string;
+      action: string;
+      blocked_countries: string;
+      enable_rate_limit: string;
+      rate_period: string;
+      rate_limit: string;
+      rate_action: string;
+      scope: string;
+      domains: string;
+    };
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const send = (data: object) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        const client = getClient();
+        if (!client) {
+          send({ type: "error", message: "请先配置 API 凭证" });
+          controller.close();
+          return;
+        }
+
+        // 解析路径
+        const pathList = paths ? paths.split(",").map(p => p.trim()).filter(Boolean) : [];
+        if (pathList.length === 0) {
+          send({ type: "error", message: "请输入要保护的路径" });
+          controller.close();
+          return;
+        }
+
+        // 解析规则
+        const ruleList = rules ? rules.split(",").filter(Boolean) : [];
+        if (ruleList.length === 0) {
+          send({ type: "error", message: "请至少选择一个防护规则" });
+          controller.close();
+          return;
+        }
+
+        // 解析白名单
+        const whitelistIps = whitelist ? whitelist.split(",").map(ip => ip.trim()).filter(Boolean) : [];
+
+        // 解析屏蔽的国家
+        const blockedCountries = blocked_countries ? blocked_countries.split(",").filter(Boolean) : [];
+
+        // 解析速率限制
+        const rateLimitConfig = enable_rate_limit === "on" ? {
+          enabled: true,
+          period: parseInt(rate_period) || 60,
+          limit: parseInt(rateLimit) || 100,
+          action: rate_action || "block"
+        } : undefined;
+
+        // 获取所有域名
+        send({ type: "log", message: "正在获取域名列表..." });
+        
+        try {
+          const allZones = await client.listZones();
+          
+          // 根据范围筛选域名
+          let targetZones = allZones;
+          if (scope === "selected" && domains) {
+            const domainList = domains.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
+            if (domainList.length === 0) {
+              send({ type: "error", message: "请输入要应用规则的域名" });
+              controller.close();
+              return;
+            }
+            targetZones = allZones.filter(zone => domainList.includes(zone.name.toLowerCase()));
+            
+            if (targetZones.length === 0) {
+              send({ type: "error", message: "未找到匹配的域名: " + domainList.join(", ") });
+              controller.close();
+              return;
+            }
+          }
+
+          send({ type: "log", message: `找到 ${targetZones.length} 个域名，开始应用规则...` });
+
+          // 获取处理方式的中文描述
+          const actionLabels: Record<string, string> = {
+            "js_challenge": "JS 质询",
+            "managed_challenge": "托管质询",
+            "block": "直接屏蔽"
+          };
+          const actionLabel = actionLabels[action] || action;
+
+          let successCount = 0;
+          let failCount = 0;
+
+          for (const zone of targetZones) {
+            try {
+              await client.createApiProtectRule(zone.id, {
+                paths: pathList,
+                rules: ruleList,
+                whitelist: whitelistIps,
+                action: action || "managed_challenge",
+                blockedCountries,
+                rateLimit: rateLimitConfig
+              });
+              successCount++;
+              send({ type: "success", domain: zone.name, message: `防护规则已应用 (${actionLabel})` });
+            } catch (err) {
+              failCount++;
+              const msg = err instanceof Error ? err.message : String(err);
+              send({ type: "fail", domain: zone.name, message: msg });
+            }
+          }
+
+          send({ type: "done", successCount, failCount, total: targetZones.length });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          send({ type: "error", message: `获取域名列表失败: ${msg}` });
+        }
+        
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+      }
+    });
+  })
+
+  // 移除 API 防护规则 (SSE 流式响应)
+  .get("/api/api-protect/remove-stream", ({ query }) => {
+    const { scope, domains } = query as { scope?: string; domains?: string };
+    
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const send = (data: object) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        const client = getClient();
+        if (!client) {
+          send({ type: "error", message: "请先配置 API 凭证" });
+          controller.close();
+          return;
+        }
+
+        send({ type: "log", message: "正在获取域名列表..." });
+        
+        try {
+          const allZones = await client.listZones();
+          
+          let targetZones = allZones;
+          if (scope === "selected" && domains) {
+            const domainList = domains.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
+            if (domainList.length > 0) {
+              targetZones = allZones.filter(zone => domainList.includes(zone.name.toLowerCase()));
+            }
+          }
+
+          send({ type: "log", message: `找到 ${targetZones.length} 个域名，开始移除规则...` });
+
+          let successCount = 0;
+          let failCount = 0;
+
+          for (const zone of targetZones) {
+            try {
+              await client.removeApiProtectRule(zone.id);
+              successCount++;
+              send({ type: "success", domain: zone.name, message: "规则已移除" });
+            } catch (err) {
+              failCount++;
+              const msg = err instanceof Error ? err.message : String(err);
+              send({ type: "fail", domain: zone.name, message: msg });
+            }
+          }
+
+          send({ type: "done", successCount, failCount, total: targetZones.length });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          send({ type: "error", message: `获取域名列表失败: ${msg}` });
+        }
+        
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+      }
+    });
+  })
+
+  // 保留原有的 POST 接口作为备用
   .post("/api/api-protect/apply", async ({ body }) => {
     const { paths, rules, whitelist, action, blocked_countries, enable_rate_limit, rate_period, rate_limit, rate_action, scope, domains } = body as {
       paths: string;
