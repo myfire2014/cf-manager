@@ -252,7 +252,157 @@ const app = new Elysia()
     );
   })
 
-  // 批量添加域名
+  // 批量添加域名 (SSE 流式响应)
+  .get("/api/batch-add-stream", ({ query }) => {
+    const { domains, target, recordType, securityLevel, proxied, records, customRecords, wildcardProxied } = query as {
+      domains: string;
+      target: string;
+      recordType: string;
+      securityLevel: string;
+      proxied: string;
+      records: string;
+      customRecords: string;
+      wildcardProxied: string;
+    };
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const send = (data: object) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        const client = getClient();
+        if (!client) {
+          send({ type: "error", message: "请先配置 API 凭证" });
+          controller.close();
+          return;
+        }
+
+        const domainList = domains ? domains.split(",").map(d => d.trim()).filter(Boolean) : [];
+        if (domainList.length === 0) {
+          send({ type: "error", message: "请输入至少一个域名" });
+          controller.close();
+          return;
+        }
+
+        if (!target) {
+          send({ type: "error", message: "请输入解析目标（IP 或 CNAME 域名）" });
+          controller.close();
+          return;
+        }
+
+        const dnsType = recordType || "A";
+
+        // 解析要添加的记录类型
+        let recordTypes: string[] = [];
+        if (records) {
+          recordTypes = records.split(",").filter(Boolean);
+        }
+        if (customRecords) {
+          const custom = customRecords.split(",").map(r => r.trim()).filter(Boolean);
+          recordTypes = [...recordTypes, ...custom];
+        }
+        if (recordTypes.length === 0) {
+          recordTypes = ["@", "www", "*"];
+        }
+
+        send({ type: "log", message: "正在获取 Account ID..." });
+
+        try {
+          const accountId = await client.getAccountId();
+          if (!accountId) {
+            send({ type: "error", message: "无法获取 Account ID" });
+            controller.close();
+            return;
+          }
+
+          send({ type: "log", message: `开始处理 ${domainList.length} 个域名，记录类型: ${recordTypes.join(", ")}` });
+
+          const isProxied = proxied === "true";
+          const isWildcardProxied = wildcardProxied === "true";
+
+          let successCount = 0;
+          let failCount = 0;
+
+          for (const domain of domainList) {
+            const details: string[] = [];
+            try {
+              // 检查域名是否已存在
+              let zone = await client.getZone(domain);
+              
+              if (!zone) {
+                const addResult = await client.addZone(domain, accountId);
+                if (!addResult.success) {
+                  failCount++;
+                  send({ type: "fail", domain, message: addResult.error || "添加失败", details: [] });
+                  continue;
+                }
+                zone = addResult.zone!;
+                details.push("✓ 域名已添加");
+              } else {
+                details.push("○ 域名已存在");
+              }
+
+              // 添加 DNS 记录
+              for (const name of recordTypes) {
+                const shouldProxy = name === "*" ? isWildcardProxied : isProxied;
+                const result = await client.addDnsRecord(zone.id, dnsType, name, target, shouldProxy);
+                if (result.success) {
+                  details.push(`✓ ${name} -> ${target} (${dnsType}) ${shouldProxy ? "[CDN]" : ""}`);
+                } else {
+                  const errMsg = result.errors?.[0]?.message || "失败";
+                  if (errMsg.includes("already exists")) {
+                    details.push(`○ ${name} 记录已存在`);
+                  } else {
+                    details.push(`✗ ${name}: ${errMsg}`);
+                  }
+                }
+              }
+
+              // 设置安全级别
+              if (securityLevel) {
+                const secResult = await client.setSecurityLevel(zone.id, securityLevel);
+                if (secResult.success) {
+                  details.push(`✓ 安全级别: ${securityLevel}`);
+                }
+              }
+
+              successCount++;
+              send({ 
+                type: "success", 
+                domain, 
+                message: "配置完成", 
+                details,
+                nameservers: zone.name_servers 
+              });
+            } catch (error) {
+              failCount++;
+              const msg = error instanceof Error ? error.message : String(error);
+              send({ type: "fail", domain, message: msg, details });
+            }
+          }
+
+          send({ type: "done", successCount, failCount, total: domainList.length });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          send({ type: "error", message: `处理失败: ${msg}` });
+        }
+
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+      }
+    });
+  })
+
+  // 保留原有的 POST 接口作为备用
   .post("/api/batch-add", async ({ body }) => {
     const { domains, target, recordType, securityLevel, proxied, records, customRecords, wildcardProxied } = body as {
       domains: string;
@@ -414,7 +564,170 @@ const app = new Elysia()
 
   // ========== 蜘蛛屏蔽 API ==========
   
-  // 应用蜘蛛屏蔽规则
+  // 应用蜘蛛屏蔽规则 (SSE 流式响应)
+  .get("/api/bot-block/apply-stream", ({ query }) => {
+    const { bots, customBots, action, scope, domains } = query as {
+      bots: string;
+      customBots: string;
+      action: string;
+      scope: string;
+      domains: string;
+    };
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const send = (data: object) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        const client = getClient();
+        if (!client) {
+          send({ type: "error", message: "请先配置 API 凭证" });
+          controller.close();
+          return;
+        }
+
+        // 合并预设和自定义蜘蛛
+        let botList: string[] = [];
+        if (bots) {
+          botList = bots.split(",").filter(Boolean);
+        }
+        if (customBots) {
+          const custom = customBots.split(",").map(b => b.trim()).filter(Boolean);
+          botList = [...botList, ...custom];
+        }
+
+        if (botList.length === 0) {
+          send({ type: "error", message: "请至少选择一个要屏蔽的蜘蛛" });
+          controller.close();
+          return;
+        }
+
+        send({ type: "log", message: "正在获取域名列表..." });
+
+        try {
+          const allZones = await client.listZones();
+          
+          // 根据范围筛选域名
+          let targetZones = allZones;
+          if (scope === "selected" && domains) {
+            const domainList = domains.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
+            if (domainList.length > 0) {
+              targetZones = allZones.filter(zone => domainList.includes(zone.name.toLowerCase()));
+            }
+          }
+
+          if (targetZones.length === 0) {
+            send({ type: "error", message: "没有找到域名" });
+            controller.close();
+            return;
+          }
+
+          send({ type: "log", message: `找到 ${targetZones.length} 个域名，开始应用规则...` });
+
+          let successCount = 0;
+          let failCount = 0;
+
+          for (const zone of targetZones) {
+            try {
+              await client.createOrUpdateBotBlockRule(zone.id, botList, action);
+              successCount++;
+              send({ type: "success", domain: zone.name, message: "规则已应用" });
+            } catch (err) {
+              failCount++;
+              const msg = err instanceof Error ? err.message : String(err);
+              send({ type: "fail", domain: zone.name, message: msg });
+            }
+          }
+
+          send({ type: "done", successCount, failCount, total: targetZones.length });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          send({ type: "error", message: `获取域名列表失败: ${msg}` });
+        }
+
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+      }
+    });
+  })
+
+  // 移除蜘蛛屏蔽规则 (SSE 流式响应)
+  .get("/api/bot-block/remove-stream", ({ query }) => {
+    const { scope, domains } = query as { scope?: string; domains?: string };
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const send = (data: object) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        const client = getClient();
+        if (!client) {
+          send({ type: "error", message: "请先配置 API 凭证" });
+          controller.close();
+          return;
+        }
+
+        send({ type: "log", message: "正在获取域名列表..." });
+
+        try {
+          const allZones = await client.listZones();
+          
+          let targetZones = allZones;
+          if (scope === "selected" && domains) {
+            const domainList = domains.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
+            if (domainList.length > 0) {
+              targetZones = allZones.filter(zone => domainList.includes(zone.name.toLowerCase()));
+            }
+          }
+
+          send({ type: "log", message: `找到 ${targetZones.length} 个域名，开始移除规则...` });
+
+          let successCount = 0;
+          let failCount = 0;
+
+          for (const zone of targetZones) {
+            try {
+              await client.removeBotBlockRule(zone.id);
+              successCount++;
+              send({ type: "success", domain: zone.name, message: "规则已移除" });
+            } catch (err) {
+              failCount++;
+              const msg = err instanceof Error ? err.message : String(err);
+              send({ type: "fail", domain: zone.name, message: msg });
+            }
+          }
+
+          send({ type: "done", successCount, failCount, total: targetZones.length });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          send({ type: "error", message: `获取域名列表失败: ${msg}` });
+        }
+
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+      }
+    });
+  })
+
+  // 保留原有的 POST 接口作为备用
   .post("/api/bot-block/apply", async ({ body }) => {
     const { bots, customBots, action } = body as {
       bots: string | string[];
