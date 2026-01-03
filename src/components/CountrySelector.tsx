@@ -6,7 +6,7 @@ export const COUNTRIES = {
       { code: "CN", flag: "🇨🇳", name: "中国", en: "China" },
       { code: "HK", flag: "🇭🇰", name: "中国香港", en: "Hong Kong" },
       { code: "MO", flag: "🇲🇴", name: "中国澳门", en: "Macau" },
-      { code: "TW", flag: "🇹🇼", name: "中国台湾", en: "Taiwan" },
+      { code: "TW", flag: "🇨🇳", name: "中国台湾", en: "Taiwan" },
       { code: "JP", flag: "🇯🇵", name: "日本", en: "Japan" },
       { code: "KR", flag: "🇰🇷", name: "韩国", en: "South Korea" },
       { code: "KP", flag: "🇰🇵", name: "朝鲜", en: "North Korea" },

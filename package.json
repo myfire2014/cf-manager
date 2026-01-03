@@ -7,13 +7,7 @@
     "start": "bun run src/index.tsx",
     "build:mac": "bun build --compile --minify --target=bun-darwin-arm64 src/index.tsx --outfile dist/cf-manager-mac",
     "build:win": "bun build --compile --minify --target=bun-windows-x64 src/index.tsx --outfile dist/cf-manager.exe",
-    "build:linux": "bun build --compile --minify --target=bun-linux-x64 src/index.tsx --outfile dist/cf-manager-linux",
-    "cli": "bun run index.ts",
-    "cc": "bun run cc-protection.ts",
-    "cc:normal": "bun run cc-protection.ts normal",
-    "cc:medium": "bun run cc-protection.ts medium",
-    "cc:high": "bun run cc-protection.ts high",
-    "cc:status": "bun run cc-protection.ts status"
+    "build:linux": "bun build --compile --minify --target=bun-linux-x64 src/index.tsx --outfile dist/cf-manager-linux"
   },
   "devDependencies": {
     "@types/bun": "latest"

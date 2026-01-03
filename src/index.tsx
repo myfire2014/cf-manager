@@ -1139,9 +1139,49 @@ const app = new Elysia()
     return <ApiProtectResult results={results} />;
   })
 
-  .listen(3000);
+  .listen({ port: 3000, hostname: "0.0.0.0" });
+
+const port = app.server?.port;
+const localUrl = `http://localhost:${port}`;
+
+// 获取本机局域网 IP
+const getLocalIP = (): string | null => {
+  const { networkInterfaces } = require("os");
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return null;
+};
+
+const localIP = getLocalIP();
+const lanUrl = localIP ? `http://${localIP}:${port}` : null;
 
 console.log(`
 ☁️  Cloudflare 批量助手已启动
-🌐 访问地址: http://localhost:${app.server?.port}
+🌐 本机访问: ${localUrl}${lanUrl ? `\n🔗 局域网访问: ${lanUrl}` : ""}
 `);
+
+// 自动打开浏览器
+const openBrowser = (targetUrl: string) => {
+  const { platform } = process;
+  try {
+    if (platform === "darwin") {
+      Bun.spawn(["open", targetUrl]);
+    } else if (platform === "win32") {
+      // Windows 的 start 是 cmd 内置命令，需要通过 cmd /c 调用
+      Bun.spawn(["cmd", "/c", "start", "", targetUrl]);
+    } else {
+      // Linux
+      Bun.spawn(["xdg-open", targetUrl]);
+    }
+  } catch (err) {
+    console.log("⚠️  无法自动打开浏览器，请手动访问上述地址");
+  }
+};
+
+openBrowser(localUrl);

@@ -55,7 +55,7 @@ bun run dev
 bun run start
 ```
 
-访问 http://localhost:3001
+访问 http://localhost:3000
 
 ### 打包分发
 
@@ -133,18 +133,7 @@ bun run build:linux
 - 配置 IP 白名单（可选）
 - 应用到所有域名
 
-## CLI 命令
 
-```bash
-# 批量添加域名（需修改 index.ts 中的配置）
-bun run cli
-
-# CC 防护快捷命令
-bun run cc:status    # 查看当前安全级别
-bun run cc:high      # 设置高安全级别
-bun run cc:medium    # 设置中等安全级别
-bun run cc:normal    # 恢复正常级别
-```
 
 ## 技术栈
 
