@@ -58,7 +58,9 @@ export const BotBlock = () => (
               rows="3" 
               class="w-full border border-gray-300 p-3 rounded-lg text-sm" 
               placeholder="YandexBot&#10;Sogou&#10;360Spider"
-            ></textarea>
+            >AwarioBot
+            ClaudeBot
+            </textarea>
             <p class="text-xs text-gray-500 mt-1">填写 User-Agent 中包含的关键词即可</p>
           </div>
 
