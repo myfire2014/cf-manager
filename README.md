@@ -32,7 +32,35 @@
 
 ### 方式一：下载编译版本
 
-从 [Releases](../../releases) 下载对应平台的可执行文件，双击运行即可。
+从 [Releases](../../releases) 下载对应平台的可执行文件：
+
+| 文件名 | 平台 |
+|--------|------|
+| cf-manager-mac | macOS Apple Silicon (M1/M2/M3) |
+| cf-manager-mac-intel | macOS Intel |
+| cf-manager.exe | Windows x64 |
+| cf-manager-linux-x64 | Linux x64 |
+| cf-manager-linux-arm64 | Linux ARM64 (RK3399/RK3588/树莓派等) |
+
+桌面系统双击运行即可。
+
+**服务器/NAS 远程运行：**
+
+```bash
+# 下载（以 ARM64 为例）
+wget https://github.com/myfire2014/cf-manager/releases/latest/download/cf-manager-linux-arm64
+
+# 添加执行权限
+chmod +x cf-manager-linux-arm64
+
+# 运行（--no-open 禁用自动打开浏览器）
+./cf-manager-linux-arm64 --no-open
+
+# 后台运行
+nohup ./cf-manager-linux-arm64 --no-open > cf-manager.log 2>&1 &
+```
+
+然后通过 `http://服务器IP:3000` 访问。
 
 ### 方式二：从源码运行
 
@@ -101,7 +129,6 @@ bun run build:linux
 |------|------|
 | [Bun](https://bun.sh) | 高性能 JavaScript 运行时 |
 | [Elysia](https://elysiajs.com) | Bun 生态最快的 Web 框架 |
-| [@kitajs/html](https://github.com/kitajs/html) | JSX 服务端渲染 |
 | [HTMX](https://htmx.org) | 无需前端 JS 的交互方案 |
 | TailwindCSS | CDN 引入，零构建 |
 | bun:sqlite | 内置 SQLite 存储配置 |

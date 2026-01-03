@@ -7,7 +7,8 @@
     "start": "bun run src/index.tsx",
     "build:mac": "bun build --compile --minify --target=bun-darwin-arm64 src/index.tsx --outfile dist/cf-manager-mac",
     "build:win": "bun build --compile --minify --target=bun-windows-x64 src/index.tsx --outfile dist/cf-manager.exe",
-    "build:linux": "bun build --compile --minify --target=bun-linux-x64 src/index.tsx --outfile dist/cf-manager-linux"
+    "build:linux": "bun build --compile --minify --target=bun-linux-x64 src/index.tsx --outfile dist/cf-manager-linux-x64",
+    "build:linux-arm64": "bun build --compile --minify --target=bun-linux-arm64 src/index.tsx --outfile dist/cf-manager-linux-arm64"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -17,7 +18,6 @@
   },
   "dependencies": {
     "@elysiajs/html": "^1.4.0",
-    "@kitajs/html": "^4.2.11",
     "elysia": "^1.4.19"
   }
 }

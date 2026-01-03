@@ -1012,12 +1012,16 @@ const getLocalIP = (): string | null => {
 const localIP = getLocalIP();
 const lanUrl = localIP ? `http://${localIP}:${port}` : null;
 
+// 解析命令行参数
+const args = process.argv.slice(2);
+const noOpen = args.includes("--no-open") || args.includes("-n");
+
 console.log(`
 ☁️  Cloudflare 批量助手已启动
 🌐 本机访问: ${localUrl}${lanUrl ? `\n🔗 局域网访问: ${lanUrl}` : ""}
 `);
 
-// 自动打开浏览器
+// 自动打开浏览器（除非指定 --no-open）
 const openBrowser = (targetUrl: string) => {
   const { platform } = process;
   try {
@@ -1035,4 +1039,6 @@ const openBrowser = (targetUrl: string) => {
   }
 };
 
-openBrowser(localUrl);
+if (!noOpen) {
+  openBrowser(localUrl);
+}
