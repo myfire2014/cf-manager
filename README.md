@@ -2,52 +2,44 @@
 
 基于 **Bun + Elysia + JSX (SSR) + HTMX** 构建的轻量级 Cloudflare 批量管理工具。
 
+单文件打包，开箱即用，支持 macOS / Windows / Linux。
+
 ## 功能特性
 
-### 🚀 批量域名管理
-- 批量添加域名到 Cloudflare
-- 支持 A 记录和 CNAME 记录
-- 灵活的 DNS 记录配置（@、www、泛域名等）
-- 自定义子域名记录
+- 🚀 **批量域名管理** - 一键添加多个域名，自动配置 DNS 记录
+- 🌐 **域名列表** - 查看所有域名状态，批量设置安全级别和 CDN
+- 🤖 **蜘蛛屏蔽** - 屏蔽恶意爬虫和 AI 爬虫
+- 🛡️ **API 防护** - 防 CC 攻击，支持速率限制和国家屏蔽
 
-### 🌐 域名管理
-- 查看所有域名及安全状态
-- 批量/单独设置安全级别（Under Attack 模式）
-- 批量/单独开关 CDN 代理
-- 泛域名 CDN 批量管理
+## 截图预览
 
-### 🤖 蜘蛛屏蔽
-- 预设常见爬虫（AhrefsBot、MJ12bot、SemrushBot 等）
-- AI 爬虫屏蔽（GPTBot、anthropic-ai、Claude-Web）
-- 自定义 User-Agent 特征
-- 支持屏蔽、JS 质询、托管质询三种处理方式
+### 域名解析（批量添加）
+![域名解析](docs/域名解析.jpeg)
 
-### 🛡️ API 防护（防 CC 攻击）
-- 指定保护路径（支持通配符）
-- 多种防护规则：
-  - 屏蔽无 Referer 请求
-  - 屏蔽非浏览器 User-Agent
-  - 屏蔽空 User-Agent
-  - 屏蔽高风险国家
-  - 质询可疑请求
-- IP 白名单支持
+### 域名列表
+![域名列表](docs/域名列表.jpeg)
 
-### 💾 其他特性
-- 本地 SQLite 存储配置
-- 单文件打包，无需安装依赖
-- 支持跨平台编译
+### 蜘蛛屏蔽
+![蜘蛛屏蔽](docs/蜘蛛屏蔽.jpeg)
+
+### API 防护
+![API防护](docs/api防护.jpeg)
+
+### 系统设置
+![系统设置](docs/系统设置.jpeg)
 
 ## 快速开始
 
-### 安装依赖
+### 方式一：下载编译版本
+
+从 [Releases](../../releases) 下载对应平台的可执行文件，双击运行即可。
+
+### 方式二：从源码运行
 
 ```bash
+# 安装依赖
 bun install
-```
 
-### 启动服务
-
-```bash
 # 开发模式（热重载）
 bun run dev
 
@@ -55,7 +47,9 @@ bun run dev
 bun run start
 ```
 
-访问 http://localhost:3000
+启动后会自动打开浏览器，也可手动访问 http://localhost:3000
+
+局域网内其他设备可通过 `http://你的IP:3000` 访问。
 
 ### 打包分发
 
@@ -70,97 +64,63 @@ bun run build:win
 bun run build:linux
 ```
 
-## 项目结构
-
-```
-├── src/
-│   ├── components/        # UI 组件
-│   │   ├── Alert.tsx      # 提示组件
-│   │   └── Layout.tsx     # 页面布局
-│   ├── services/          # 业务逻辑
-│   │   ├── cloudflare.ts  # Cloudflare API 封装
-│   │   └── db.ts          # SQLite 数据存储
-│   ├── views/             # 页面
-│   │   ├── Home.tsx       # 批量操作控制台
-│   │   ├── Domains.tsx    # 域名列表管理
-│   │   ├── BotBlock.tsx   # 蜘蛛屏蔽
-│   │   ├── ApiProtect.tsx # API 防护
-│   │   └── Settings.tsx   # 系统设置
-│   └── index.tsx          # 程序入口
-├── index.ts               # CLI 批量脚本
-├── cc-protection.ts       # CC 防护快捷脚本
-└── package.json
-```
-
 ## 使用说明
 
 ### 1. 配置 API 凭证
 
-首次使用需在「设置」页面配置：
+首次使用需在「系统设置」页面配置：
 - Cloudflare 账户邮箱
-- Global API Key（在 Cloudflare 控制台 → My Profile → API Tokens 获取）
+- Global API Key（在 [Cloudflare 控制台](https://dash.cloudflare.com/profile/api-tokens) → My Profile → API Tokens 获取）
 
 ### 2. 批量添加域名
 
-在「仪表盘」页面：
-1. 输入域名列表（每行一个）
+1. 输入域名列表（每行一个或逗号分隔）
 2. 选择记录类型（A 记录或 CNAME）
 3. 填写解析目标（IP 或 CNAME 域名）
-4. 选择 DNS 记录类型（@、www、*、api 等）
+4. 选择 DNS 记录（@、www、*、自定义）
 5. 设置 CDN 代理和安全级别
 6. 点击「开始执行」
 
-### 3. 域名管理
+### 3. 蜘蛛屏蔽
 
-在「域名管理」页面：
-- 查看所有域名及当前安全级别
-- 批量操作：全部高防、全部恢复、泛域名 CDN 开关
-- 单域名操作：CDN 开关、高防模式切换
+- 预设常见爬虫：AhrefsBot、MJ12bot、SemrushBot 等
+- AI 爬虫：GPTBot、anthropic-ai、Claude-Web
+- 支持自定义 User-Agent 特征
+- 三种处理方式：屏蔽、JS 质询、托管质询
 
-### 4. 蜘蛛屏蔽
+### 4. API 防护
 
-在「蜘蛛屏蔽」页面：
-- 勾选要屏蔽的爬虫
-- 添加自定义 User-Agent 特征
-- 选择处理方式（屏蔽/质询）
-- 应用到所有域名
-
-### 5. API 防护
-
-在「API 防护」页面：
-- 输入要保护的路径（如 `/api/*`、`/login`）
-- 选择防护规则
-- 配置 IP 白名单（可选）
-- 应用到所有域名
-
-
+- 指定保护路径（支持通配符如 `/api/*`）
+- 防护规则：屏蔽无 Referer、非浏览器 UA、空 UA、高风险国家
+- 速率限制：可配置时间窗口和请求上限
+- IP 白名单支持
 
 ## 技术栈
 
 | 组件 | 说明 |
 |------|------|
-| Bun | 高性能 JavaScript 运行时 |
-| Elysia | Bun 生态最快的 Web 框架 |
-| @kitajs/html | JSX 服务端渲染 |
-| HTMX | 无需前端 JS 的交互方案 |
+| [Bun](https://bun.sh) | 高性能 JavaScript 运行时 |
+| [Elysia](https://elysiajs.com) | Bun 生态最快的 Web 框架 |
+| [@kitajs/html](https://github.com/kitajs/html) | JSX 服务端渲染 |
+| [HTMX](https://htmx.org) | 无需前端 JS 的交互方案 |
 | TailwindCSS | CDN 引入，零构建 |
 | bun:sqlite | 内置 SQLite 存储配置 |
 
-## WAF 规则说明
+## 项目结构
 
-本工具创建的 WAF 规则：
-
-| 规则名称 | 功能 |
-|----------|------|
-| Block Bad Bots | 蜘蛛/爬虫屏蔽 |
-| API Protection - * | API 防护系列规则 |
+```
+├── src/
+│   ├── components/        # UI 组件
+│   ├── services/          # Cloudflare API 和数据存储
+│   ├── views/             # 页面视图
+│   └── index.tsx          # 程序入口
+├── docs/                  # 截图文档
+└── cf-manager.sqlite      # 配置数据（运行时生成）
+```
 
 ## 注意事项
 
-- 泛域名 (`*`) 开启 CDN 需要 Cloudflare 企业版证书
-- API 请求有速率限制，批量操作会自动控制请求间隔
 - 配置数据存储在 `cf-manager.sqlite` 文件中
-- WAF 规则会应用到所有域名，请谨慎配置
 - API 防护规则可能影响移动端 APP 或第三方回调，请配置白名单
 
 ## License

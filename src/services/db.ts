@@ -1,6 +1,18 @@
 import { Database } from "bun:sqlite";
+import { dirname, join } from "path";
 
-const db = new Database("cf-manager.sqlite");
+// 获取数据库文件路径（与可执行文件同目录）
+const getDbPath = () => {
+  const execPath = process.execPath;
+  // 判断是否为打包后的可执行文件（非 bun 运行时）
+  if (!execPath.includes("bun")) {
+    return join(dirname(execPath), "cf-manager.sqlite");
+  }
+  // 开发模式使用当前目录
+  return "cf-manager.sqlite";
+};
+
+const db = new Database(getDbPath());
 
 // 初始化表
 db.run(`
