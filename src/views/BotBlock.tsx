@@ -9,9 +9,12 @@ const defaultBots = [
   { name: "ChatGPT-User", desc: "ChatGPT 浏览插件", checked: false },
   { name: "anthropic-ai", desc: "Anthropic Claude 爬虫", checked: true },
   { name: "Claude-Web", desc: "Claude 网页爬虫", checked: true },
+  { name: "ClaudeBot", desc: "Anthropic ClaudeBot 爬虫", checked: true },
   { name: "CCBot", desc: "Common Crawl 爬虫", checked: false },
   { name: "Bytespider", desc: "字节跳动爬虫", checked: false },
   { name: "PetalBot", desc: "华为花瓣搜索爬虫", checked: false },
+  { name: "AwarioBot", desc: "Awario 社交监控爬虫", checked: true },
+  { name: "Amazonbot", desc: "Amazon Alexa 爬虫", checked: true },
 ];
 
 export const BotBlock = () => (
@@ -58,9 +61,7 @@ export const BotBlock = () => (
               rows="3" 
               class="w-full border border-gray-300 p-3 rounded-lg text-sm" 
               placeholder="YandexBot&#10;Sogou&#10;360Spider"
-            >AwarioBot
-            ClaudeBot
-            </textarea>
+            ></textarea>
             <p class="text-xs text-gray-500 mt-1">填写 User-Agent 中包含的关键词即可</p>
           </div>
 
