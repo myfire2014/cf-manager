@@ -344,6 +344,16 @@ const app = new Elysia()
                 details.push("○ 域名已存在");
               }
 
+              // 检查并清空现有 DNS 记录
+              const existingRecords = await client.getDnsRecords(zone.id);
+              if (existingRecords.length > 0) {
+                details.push(`⏳ 发现 ${existingRecords.length} 条现有记录，正在清空...`);
+                const deleteResult = await client.deleteAllDnsRecords(zone.id);
+                if (deleteResult.deleted > 0) {
+                  details.push(`✓ 已清空 ${deleteResult.deleted} 条记录${deleteResult.failed > 0 ? `，${deleteResult.failed} 条失败` : ""}`);
+                }
+              }
+
               // 添加 DNS 记录
               for (const name of recordTypes) {
                 const shouldProxy = name === "*" ? isWildcardProxied : isProxied;
@@ -352,11 +362,7 @@ const app = new Elysia()
                   details.push(`✓ ${name} -> ${target} (${dnsType}) ${shouldProxy ? "[CDN]" : ""}`);
                 } else {
                   const errMsg = result.errors?.[0]?.message || "失败";
-                  if (errMsg.includes("already exists")) {
-                    details.push(`○ ${name} 记录已存在`);
-                  } else {
-                    details.push(`✗ ${name}: ${errMsg}`);
-                  }
+                  details.push(`✗ ${name}: ${errMsg}`);
                 }
               }
 
@@ -478,6 +484,16 @@ const app = new Elysia()
           details.push("○ 域名已存在");
         }
 
+        // 检查并清空现有 DNS 记录
+        const existingRecords = await client.getDnsRecords(zone.id);
+        if (existingRecords.length > 0) {
+          details.push(`⏳ 发现 ${existingRecords.length} 条现有记录，正在清空...`);
+          const deleteResult = await client.deleteAllDnsRecords(zone.id);
+          if (deleteResult.deleted > 0) {
+            details.push(`✓ 已清空 ${deleteResult.deleted} 条记录${deleteResult.failed > 0 ? `，${deleteResult.failed} 条失败` : ""}`);
+          }
+        }
+
         // 添加 DNS 记录
         for (const name of recordTypes) {
           // 泛域名特殊处理 CDN 设置
@@ -487,11 +503,7 @@ const app = new Elysia()
             details.push(`✓ ${name} -> ${target} (${dnsType}) ${shouldProxy ? "[CDN]" : ""}`);
           } else {
             const errMsg = result.errors?.[0]?.message || "失败";
-            if (errMsg.includes("already exists")) {
-              details.push(`○ ${name} 记录已存在`);
-            } else {
-              details.push(`✗ ${name}: ${errMsg}`);
-            }
+            details.push(`✗ ${name}: ${errMsg}`);
           }
         }
 

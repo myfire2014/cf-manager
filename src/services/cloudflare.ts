@@ -107,6 +107,28 @@ export class CloudflareClient {
     return result.result || [];
   }
 
+  async deleteDnsRecord(zoneId: string, recordId: string) {
+    const result = await this.request<{ id: string }>("DELETE", `/zones/${zoneId}/dns_records/${recordId}`);
+    return result;
+  }
+
+  async deleteAllDnsRecords(zoneId: string): Promise<{ deleted: number; failed: number }> {
+    const records = await this.getDnsRecords(zoneId);
+    let deleted = 0;
+    let failed = 0;
+    
+    for (const record of records) {
+      const result = await this.deleteDnsRecord(zoneId, record.id);
+      if (result.success) {
+        deleted++;
+      } else {
+        failed++;
+      }
+    }
+    
+    return { deleted, failed };
+  }
+
   async getSecurityLevel(zoneId: string): Promise<string> {
     const result = await this.request<{ value: string }>("GET", `/zones/${zoneId}/settings/security_level`);
     return result.result?.value || "unknown";
